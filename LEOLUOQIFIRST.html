@@ -61,8 +61,7 @@
         .bubble-user { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-bottom-left-radius: 0; }
         .bubble-admin { background: #1f6feb; color: white; border-bottom-right-radius: 0; }
         .chat-input-box { padding: 15px; background: #161b22; border-top: 1px solid #30363d; display: flex; gap: 10px; }
-        .del-chat { font-size: 12px; color: #da3633; cursor: pointer; margin-left: 5px; opacity: 0.6; }
-        .del-chat:hover { opacity: 1; }
+        .del-msg { font-size: 12px; color: #da3633; cursor: pointer; margin-left: 5px; font-weight: bold; }
 
         /* 登录层 */
         #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#0d1117; z-index:9999; display:flex; justify-content:center; align-items:center; }
@@ -183,8 +182,9 @@
         const CONFIG = { appId: "SKHyBQH4nGeF6PDB8MVLTMD4-MdYXbMMI", appKey: "kUQ2O1stpz6V8bNhcbk2tkrV", serverURL: "https://skhybqh4.api.lncldglobal.com" };
         AV.init(CONFIG);
 
-        let currentChatUser = null; // 当前正在聊天的对象
+        let currentChatUser = null; 
         let editingId = null;
+        let chatTimer = null;
 
         // === 登录 ===
         async function doLogin() {
@@ -198,19 +198,21 @@
             } catch(err) { alert("登录失败: " + err.message); }
         }
         function initData() { loadOrders(); loadProducts(); loadUsers(); loadNotices(); loadContactList(); loadQR(); }
+        
         function switchTab(t) {
             document.querySelectorAll('.main').forEach(m=>m.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
             document.getElementById('tab-'+t).classList.add('active');
-            // 自动刷新数据
+            
+            // 切换时刷新对应数据
             if(t==='orders') loadOrders();
-            if(t==='chat') { loadContactList(); startChatPoll(); }
+            if(t==='chat') { loadContactList(); startChatPoll(); } else { stopChatPoll(); }
             if(t==='users') loadUsers();
             if(t==='notices') loadNotices();
         }
 
         // =======================
-        // 1. 订单管理 (详细弹窗版)
+        // 1. 订单管理
         // =======================
         async function loadOrders() {
             const d=document.getElementById('order-table'); d.innerHTML="Loading...";
@@ -219,244 +221,98 @@
                 const u = o.get('email') || "未知";
                 const s = o.get('status');
                 const btn = s==='pending' ? `<button class="btn-sm btn-blue" onclick="confirmOrder('${o.id}')">确认收款</button>` : `<span style="color:#2ea043">✅ 完成</span>`;
-                d.innerHTML += `
-                    <tr>
-                        <td>${o.createdAt.toLocaleString()}</td>
-                        <td>${u}</td>
-                        <td style="color:#f85149;font-weight:bold">¥${o.get('total')}</td>
-                        <td>${s==='pending'?'⏳ 待处理':'✅ 已完成'}</td>
-                        <td><button class="btn-sm" onclick="showOrder('${o.id}')">查看详情</button></td>
-                        <td>${btn}</td>
-                    </tr>`;
+                d.innerHTML += `<tr><td>${o.createdAt.toLocaleString()}</td><td>${u}</td><td style="color:#f85149;font-weight:bold">¥${o.get('total')}</td><td>${s==='pending'?'⏳ 待处理':'✅ 已完成'}</td><td><button class="btn-sm" onclick="showOrder('${o.id}')">查看详情</button></td><td>${btn}</td></tr>`;
             });
         }
-        
         async function showOrder(id) {
-            const q = new AV.Query('Order');
-            const o = await q.get(id);
-            const items = o.get('items');
-            const user = o.get('email');
-            
-            let html = `<div style="margin-bottom:20px; color:#8b949e">
-                订单号: ${o.id}<br>
-                买家: ${user}<br>
-                时间: ${o.createdAt.toLocaleString()}
-            </div>`;
-
-            items.forEach(i => {
-                html += `
-                    <div class="order-detail-item">
-                        <img src="${i.image}" onerror="this.src='https://via.placeholder.com/60'">
-                        <div class="detail-info">
-                            <div style="font-weight:bold; color:#fff">${i.name}</div>
-                            <div style="color:#f85149">¥${i.price} x ${i.count}</div>
-                        </div>
-                        <div style="font-weight:bold; color:#fff">¥${i.price * i.count}</div>
-                    </div>
-                `;
-            });
-            
+            const q = new AV.Query('Order'); const o = await q.get(id); const items = o.get('items');
+            let html = `<div style="margin-bottom:20px; color:#8b949e">订单号: ${o.id}<br>买家: ${o.get('email')}<br>时间: ${o.createdAt.toLocaleString()}</div>`;
+            items.forEach(i => { html += `<div class="order-detail-item"><img src="${i.image}" onerror="this.src='https://via.placeholder.com/60'"><div class="detail-info"><div style="font-weight:bold; color:#fff">${i.name}</div><div style="color:#f85149">¥${i.price} x ${i.count}</div></div><div style="font-weight:bold; color:#fff">¥${i.price * i.count}</div></div>`; });
             html += `<div style="text-align:right; font-size:20px; font-weight:bold; color:#f85149; margin-top:20px;">总计: ¥${o.get('total')}</div>`;
-            
-            document.getElementById('order-details-body').innerHTML = html;
-            document.getElementById('order-modal').style.display = 'flex';
+            document.getElementById('order-details-body').innerHTML = html; document.getElementById('order-modal').style.display = 'flex';
         }
-
-        async function confirmOrder(id) { if(confirm("确认已收到款项？")) { const o=AV.Object.createWithoutData('Order',id); o.set('status','paid'); await o.save(); loadOrders(); } }
+        async function confirmOrder(id) { if(confirm("确认已收款？")) { const o=AV.Object.createWithoutData('Order',id); o.set('status','paid'); await o.save(); loadOrders(); } }
 
         // =======================
-        // 2. 独立客服系统 (核心升级)
+        // 2. 独立客服 (修复版)
         // =======================
-        let chatTimer = null;
+        function startChatPoll() { if(chatTimer) clearInterval(chatTimer); chatTimer = setInterval(() => { if(currentChatUser) loadChatHistory(currentChatUser); loadContactList(); }, 3000); }
+        function stopChatPoll() { if(chatTimer) clearInterval(chatTimer); }
 
-        function startChatPoll() {
-            if(chatTimer) clearInterval(chatTimer);
-            chatTimer = setInterval(() => {
-                if(currentChatUser) loadChatHistory(currentChatUser); // 只刷新当前对话
-                loadContactList(); // 刷新左侧列表（看有无新消息）
-            }, 3000);
-        }
-
-        // 加载左侧联系人列表 (按最近消息排序)
         async function loadContactList() {
-            // 获取最近的 100 条消息来分析有哪些联系人
-            const q = new AV.Query('ChatMessage');
-            q.descending('createdAt');
-            q.limit(100);
-            const msgs = await q.find();
-            
-            // 提取唯一的 channel (用户名)
+            const q = new AV.Query('ChatMessage'); q.descending('createdAt'); q.limit(100); const msgs = await q.find();
             const contacts = new Set();
-                    // 加载左侧联系人列表
-        async function loadContactList() {
-            const q = new AV.Query('ChatMessage');
-            q.descending('createdAt');
-            q.limit(100); // 扫描最近100条
-            const msgs = await q.find();
+            msgs.forEach(m => { let u = m.get('channel') || m.get('senderName'); if(u && u!=='Admin') contacts.add(u); });
             
-            const contacts = new Set();
-            
-            msgs.forEach(m => {
-                // 逻辑：优先取频道，没有频道取发送者
-                let user = m.get('channel') || m.get('senderName');
-                
-                // 排除管理员自己 (Admin不应该出现在联系人列表里)
-                if (user && user !== 'Admin') {
-                    contacts.add(user);
-                }
-            });
-
             const listDiv = document.getElementById('contact-list');
+            if(contacts.size === 0) { listDiv.innerHTML = "<div style='padding:20px;color:#666;text-align:center'>暂无消息</div>"; return; }
             
-            if (contacts.size === 0) {
-                listDiv.innerHTML = "<div style='padding:20px;color:#666;text-align:center'>暂无访客留言<br>去前台发一条试试</div>";
-                return;
-            }
-
-            let html = "";
-            contacts.forEach(c => {
-                const active = c === currentChatUser ? 'active' : ''; // 保持选中状态
-                html += `
-                <div class="contact-item ${active}" onclick="selectUser('${c}')">
-                    <div class="contact-name">👤 ${c}</div>
-                    <div class="contact-last" style="font-size:12px; color:#666">点击查看对话</div>
-                </div>`;
-            });
-            listDiv.innerHTML = html;
-        }
-
-            const listDiv = document.getElementById('contact-list');
-            // 保持当前选中的高亮，不完全重绘导致闪烁
             let html = "";
             contacts.forEach(c => {
                 const active = c === currentChatUser ? 'active' : '';
-                html += `<div class="contact-item ${active}" onclick="selectUser('${c}')">
-                    <div class="contact-name">${c}</div>
-                    <div class="contact-last">点击查看记录...</div>
-                </div>`;
+                html += `<div class="contact-item ${active}" onclick="selectUser('${c}')"><div class="contact-name">👤 ${c}</div><div class="contact-last" style="font-size:12px; color:#666">点击查看对话</div></div>`;
             });
             listDiv.innerHTML = html;
         }
 
-        // 选择一个用户，进入聊天
-        function selectUser(user) {
-            currentChatUser = user;
-            document.getElementById('chat-header').innerText = "正在对话: " + user;
-            loadChatHistory(user);
-            loadContactList(); // 更新高亮
-        }
+        function selectUser(user) { currentChatUser = user; document.getElementById('chat-header').innerText = "正在对话: " + user; loadChatHistory(user); loadContactList(); }
 
-        // 加载特定用户的聊天记录
         async function loadChatHistory(user) {
-            const q = new AV.Query('ChatMessage');
-            q.equalTo('channel', user);
-            q.ascending('createdAt');
-            const msgs = await q.find();
-            
-            const area = document.getElementById('msg-area');
-            area.innerHTML = "";
-            
+            const q = new AV.Query('ChatMessage'); q.equalTo('channel', user); q.ascending('createdAt'); const msgs = await q.find();
+            const area = document.getElementById('msg-area'); area.innerHTML = "";
             msgs.forEach(m => {
-                const isAdmin = m.get('isAdmin');
-                const txt = m.get('content');
-                // 删除按钮
-                const delBtn = `<span class="del-msg" onclick="delMsg('${m.id}')" title="删除">🗑️</span>`;
-                
-                area.innerHTML += `
-                    <div class="msg-row ${isAdmin?'me':'other'}">
-                        <div class="bubble ${isAdmin?'bubble-admin':'bubble-user'}">
-                            ${txt} ${delBtn}
-                        </div>
-                    </div>`;
+                const isAdmin = m.get('isAdmin'); const txt = m.get('content');
+                const delBtn = `<span class="del-msg" onclick="delMsg('${m.id}')">🗑️</span>`;
+                area.innerHTML += `<div class="msg-row ${isAdmin?'me':'other'}"><div class="bubble ${isAdmin?'bubble-admin':'bubble-user'}">${txt} ${delBtn}</div></div>`;
             });
-            // 滚动到底部
-            // area.scrollTop = area.scrollHeight; 
         }
 
         async function sendReply() {
-            if(!currentChatUser) return alert("请先在左侧选择一个联系人");
-            const txt = document.getElementById('reply-txt').value;
-            if(!txt) return;
-            
-            const Msg = AV.Object.extend('ChatMessage');
-            const m = new Msg();
-            m.set('content', txt);
-            m.set('senderName', 'Admin');
-            m.set('isAdmin', true);
-            m.set('channel', currentChatUser); // 发到该用户的频道
-            
-            await m.save();
-            document.getElementById('reply-txt').value = "";
-            loadChatHistory(currentChatUser);
+            if(!currentChatUser) return alert("请先选择联系人");
+            const txt = document.getElementById('reply-txt').value; if(!txt) return;
+            const m = new (AV.Object.extend('ChatMessage'))();
+            m.set('content', txt); m.set('senderName', 'Admin'); m.set('isAdmin', true); m.set('channel', currentChatUser);
+            await m.save(); document.getElementById('reply-txt').value = ""; loadChatHistory(currentChatUser);
         }
-
-        async function delMsg(id) {
-            if(confirm("删除这条消息？")) {
-                const m = AV.Object.createWithoutData('ChatMessage', id);
-                await m.destroy();
-                if(currentChatUser) loadChatHistory(currentChatUser);
-            }
-        }
+        async function delMsg(id) { if(confirm("删除消息？")) { await AV.Object.createWithoutData('ChatMessage', id).destroy(); if(currentChatUser) loadChatHistory(currentChatUser); } }
 
         // =======================
-        // 3. 公告系统
+        // 3. 公告系统 (修复版)
         // =======================
         async function postNotice() {
-            const t = document.getElementById('notice-txt').value;
-            if(!t) return alert("内容为空");
-            
+            const txt = document.getElementById('notice-txt').value; if(!txt) return alert("内容为空");
             try {
-                const N = AV.Object.extend('Announcement');
-                const n = new N();
-                n.set('content', t);
-                await n.save();
-                alert("✅ 公告发布成功！前台已更新。");
-                document.getElementById('notice-txt').value = "";
-                loadNotices();
-            } catch(e) {
-                alert("❌ 发布失败: " + e.message + "\n(请检查 LeanCloud 'Announcement' 表的 create 权限是否选了 '所有用户')");
-            }
+                const notice = new (AV.Object.extend('Announcement'))();
+                notice.set('content', txt);
+                const acl = new AV.ACL(); acl.setPublicReadAccess(true); acl.setWriteAccess(AV.User.current(), true);
+                notice.setACL(acl); await notice.save();
+                alert("✅ 发布成功"); document.getElementById('notice-txt').value = ""; loadNotices();
+            } catch(e) { alert("发布失败: " + e.message); }
         }
-
         async function loadNotices() {
-            const d = document.getElementById('notice-list');
-            const q = new AV.Query('Announcement'); q.descending('createdAt');
-            const res = await q.find();
-            d.innerHTML = "";
-            res.forEach(n => {
-                d.innerHTML += `<div style="padding:10px; border-bottom:1px solid #30363d; display:flex; justify-content:space-between"><span>${n.get('content')}</span> <button class="btn-sm btn-red" onclick="delNotice('${n.id}')">删</button></div>`;
-            });
+            const q=new AV.Query('Announcement'); q.descending('createdAt'); const res=await q.find();
+            document.getElementById('notice-list').innerHTML = res.map(n=>`<div style="padding:10px; border-bottom:1px solid #30363d; display:flex; justify-content:space-between"><span>${n.get('content')}</span> <button class="btn-sm btn-red" onclick="delNotice('${n.id}')">删</button></div>`).join('');
         }
-        async function delNotice(id) { const n=AV.Object.createWithoutData('Announcement',id); await n.destroy(); loadNotices(); }
+        async function delNotice(id) { await AV.Object.createWithoutData('Announcement',id).destroy(); loadNotices(); }
 
         // =======================
-        // 4. 其他功能 (用户/商品/收款码) - 保持精简
+        // 4. 其他 (用户/商品/收款码)
         // =======================
         async function loadUsers() {
             const q=new AV.Query('_User'); q.descending('createdAt'); const res=await q.find();
             const bq=new AV.Query('Blacklist'); const bres=await bq.find(); const bans=bres.map(b=>b.get('email'));
-            document.getElementById('user-table').innerHTML = res.map(u=>{
-                const e=u.getEmail()||u.getUsername(); const isB=bans.includes(e);
-                return `<tr><td>${e}</td><td>${u.id}</td><td>${u.createdAt.toLocaleString()}</td><td><button class="btn-sm ${isB?'btn-blue':'btn-red'}" onclick="toggleBan('${e}',${isB})">${isB?'解封':'封禁'}</button></td></tr>`;
-            }).join('');
+            document.getElementById('user-table').innerHTML = res.map(u=>{ const e=u.getEmail()||u.getUsername(); const isB=bans.includes(e); return `<tr><td>${e}</td><td>${u.id}</td><td>${u.createdAt.toLocaleString()}</td><td><button class="btn-sm ${isB?'btn-blue':'btn-red'}" onclick="toggleBan('${e}',${isB})">${isB?'解封':'封禁'}</button></td></tr>`}).join('');
         }
-        async function toggleBan(e,isB){ if(isB){const q=new AV.Query('Blacklist');q.equalTo('email',e);(await q.find()).forEach(x=>x.destroy());}else{const B=AV.Object.extend('Blacklist');const b=new B();b.set('email',e);await b.save();} loadUsers(); }
+        async function toggleBan(e,isB){ if(isB){const q=new AV.Query('Blacklist');q.equalTo('email',e);(await q.find()).forEach(x=>x.destroy());}else{const b=new(AV.Object.extend('Blacklist'))();b.set('email',e);await b.save();} loadUsers(); }
         async function liftBan(){ const v=document.getElementById('unblock-id').value; const q=new AV.Query('RegistrationLog'); q.equalTo('email',v); (await q.find()).forEach(x=>x.destroy()); alert("Done"); }
         
-        async function handleProduct(){
-            const n=document.getElementById('p-name').value, p=Number(document.getElementById('p-price').value), i=document.getElementById('p-img').value;
-            if(!n) return;
-            if(editingId) { const P=AV.Object.createWithoutData('Product',editingId); P.set('name',n); P.set('price',p); P.set('image',i); await P.save(); cancelEdit(); }
-            else { const P=AV.Object.extend('Product'); const obj=new P(); obj.set('name',n); obj.set('price',p); obj.set('image',i); await obj.save(); }
-            loadProducts();
-        }
+        async function handleProduct(){ const n=document.getElementById('p-name').value, p=Number(document.getElementById('p-price').value), i=document.getElementById('p-img').value; if(!n) return; if(editingId) { const P=AV.Object.createWithoutData('Product',editingId); P.set('name',n); P.set('price',p); P.set('image',i); await P.save(); cancelEdit(); } else { const P=AV.Object.extend('Product'); const obj=new P(); obj.set('name',n); obj.set('price',p); obj.set('image',i); await obj.save(); } loadProducts(); }
         async function loadProducts(){ const q=new AV.Query('Product'); q.descending('createdAt'); const r=await q.find(); document.getElementById('prod-list').innerHTML=r.map(p=>`<div style="padding:10px;border-bottom:1px solid #333">${p.get('name')} <button class="btn-sm btn-blue" onclick="startEdit('${p.id}','${p.get('name')}',${p.get('price')},'${p.get('image')}')">改</button> <button class="btn-sm btn-red" onclick="delP('${p.id}')">删</button></div>`).join(''); }
-        function startEdit(id,n,p,i){ editingId=id; document.getElementById('p-name').value=n; document.getElementById('p-price').value=p; document.getElementById('p-img').value=i; document.getElementById('submit-btn').innerText="保存修改"; document.getElementById('cancel-btn').style.display='inline'; }
-        function cancelEdit(){ editingId=null; document.getElementById('p-name').value=""; document.getElementById('p-price').value=""; document.getElementById('p-img').value=""; document.getElementById('submit-btn').innerText="发布商品"; document.getElementById('cancel-btn').style.display='none'; }
-        async function delP(id){ if(confirm("删?")){ const p=AV.Object.createWithoutData('Product',id); await p.destroy(); loadProducts(); }}
+        function startEdit(id,n,p,i){ editingId=id; document.getElementById('p-name').value=n; document.getElementById('p-price').value=p; document.getElementById('p-img').value=i; document.getElementById('submit-btn').innerText="保存"; document.getElementById('cancel-btn').style.display='inline'; }
+        function cancelEdit(){ editingId=null; document.getElementById('p-name').value=""; document.getElementById('p-price').value=""; document.getElementById('p-img').value=""; document.getElementById('submit-btn').innerText="发布"; document.getElementById('cancel-btn').style.display='none'; }
+        async function delP(id){ if(confirm("删?")){ await AV.Object.createWithoutData('Product',id).destroy(); loadProducts(); }}
         async function saveQR(){ const u=document.getElementById('qr-url').value; const q=new AV.Query('GlobalConfig'); let c; try{c=await q.first()}catch(e){} if(!c){const C=AV.Object.extend('GlobalConfig');c=new C()} c.set('paymentQR',u); await c.save(); alert("Saved"); }
         async function loadQR(){ const q=new AV.Query('GlobalConfig'); const c=await q.first(); if(c)document.getElementById('qr-url').value=c.get('paymentQR'); }
     </script>
 </body>
 </html>
-
