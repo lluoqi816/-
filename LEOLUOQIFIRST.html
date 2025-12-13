@@ -201,4 +201,32 @@
                 div.innerHTML += `<div class="chat-row"><div class="chat-bubble ${isAdmin?'bubble-admin':'bubble-user'}"><b>${isAdmin?'Me':m.get('senderName')}:</b> ${txt}</div></div>`;
             });
         }
-        async function 
+        async function sendReply() {
+            const txt = document.getElementById('reply-txt').value; if(!txt) return;
+            const Chat = AV.Object.extend('ChatMessage'); const msg = new Chat();
+            msg.set('content', txt); msg.set('senderName', 'Admin'); msg.set('isAdmin', true);
+            await msg.save(); document.getElementById('reply-txt').value = ""; loadAdminChat();
+        }
+        function scrollChat() { setTimeout(() => { const d = document.getElementById('chat-admin-list'); d.scrollTop = d.scrollHeight; }, 200); }
+
+        // === 商品发布 (简略) ===
+        async function uploadProduct() {
+            const name = document.getElementById('p-name').value;
+            const price = Number(document.getElementById('p-price').value);
+            const imgRaw = document.getElementById('p-img').value;
+            if(!name || !price || !imgRaw) return alert("填写完整");
+            const imgs = imgRaw.split(',');
+            const P = AV.Object.extend('Product'); const p = new P();
+            p.set('name', name); p.set('price', price); p.set('image', imgs[0]);
+            await p.save(); alert("发布成功"); loadMyProducts();
+        }
+        async function loadMyProducts() {
+            const q = new AV.Query('Product'); q.descending('createdAt'); const res = await q.find();
+            document.getElementById('manager-list').innerHTML = res.map(p=>`<div>${p.get('name')} - ¥${p.get('price')} <button class="btn-sm btn-del" onclick="delP('${p.id}')">删</button></div>`).join('');
+        }
+        async function delP(id) {
+            const p = AV.Object.createWithoutData('Product', id); await p.destroy(); loadMyProducts();
+        }
+    </script>
+</body>
+</html>
