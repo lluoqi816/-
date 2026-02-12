@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>🌈 彩虹哈希 · 名字Gay指数计算器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: linear-gradient(145deg, #f8f0fc 0%, #fff4e6 100%);
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .rainbow-card {
+            max-width: 650px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 48px 48px 32px 32px;
+            box-shadow: 0 25px 40px -15px rgba(0,0,0,0.15);
+            padding: 30px 28px;
+            border: 1px solid rgba(255,255,255,0.5);
+            transition: all 0.2s ease;
+        }
+
+        /* 彩虹条纹顶边 */
+        .rainbow-header {
+            height: 10px;
+            width: calc(100% + 56px);
+            margin: -30px 0 20px -28px;
+            border-radius: 48px 48px 0 0;
+            background: linear-gradient(90deg, 
+                #FF385C 0%, #FF9F1C 17%, 
+                #FFD166 34%, #06D6A0 51%, 
+                #1B98F5 68%, #9381FF 85%, 
+                #E83F6F 100%);
+            background-size: 200% 100%;
+            animation: shimmer 8s infinite alternate;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% 0; }
+            100% { background-position: 100% 0; }
+        }
+
+        h1 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 2.1rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #2b2d42;
+            margin-bottom: 5px;
+        }
+
+        h1 span {
+            background: linear-gradient(45deg, #f72585, #b5179e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 2.3rem;
+        }
+
+        .sub {
+            color: #5e548e;
+            font-weight: 500;
+            margin-bottom: 28px;
+            padding-bottom: 10px;
+            border-bottom: 2px dashed #cdb4db;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 0.95rem;
+        }
+
+        .input-area {
+            background: white;
+            border-radius: 120px;
+            padding: 6px 6px 6px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            box-shadow: 0 8px 20px rgba(225, 180, 230, 0.2);
+            border: 1px solid #ffc2d1;
+            margin-bottom: 30px;
+        }
+
+        .input-area input {
+            flex: 1 1 180px;
+            border: none;
+            padding: 16px 5px 16px 0;
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #1e1e2f;
+            background: transparent;
+            outline: none;
+            min-width: 140px;
+        }
+
+        .input-area input::placeholder {
+            color: #b8b8d0;
+            font-weight: 400;
+            font-size: 1rem;
+        }
+
+        .rainbow-btn {
+            background: linear-gradient(145deg, #ff4d6d, #ff0a54);
+            border: none;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid rgba(255,255,255,0.4);
+            box-shadow: 0 5px 15px rgba(255, 72, 110, 0.4);
+        }
+
+        .rainbow-btn:hover {
+            transform: scale(1.02);
+            background: linear-gradient(145deg, #ff3355, #e5004a);
+            box-shadow: 0 8px 22px rgba(255, 72, 110, 0.6);
+        }
+
+        .rainbow-btn:active {
+            transform: scale(0.98);
+        }
+
+        .result-panel {
+            background: rgba(253, 242, 250, 0.7);
+            border-radius: 32px;
+            padding: 28px 24px;
+            margin-top: 10px;
+            border: 1px solid rgba(255, 219, 229, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .hash-badge {
+            background: #1e1e2a;
+            color: #f8f0fc;
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            padding: 12px 18px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            word-break: break-all;
+            border-left: 10px solid #ff9e00;
+            margin-bottom: 25px;
+            box-shadow: inset 0 0 0 1px #3e3e5e;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hash-value {
+            letter-spacing: 2px;
+            font-weight: 600;
+            color: #ffe38f;
+        }
+
+        .gay-meter {
+            margin: 24px 0 20px;
+        }
+
+        .meter-label {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            color: #3a2e4a;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .progress-bg {
+            background: #e9d7e3;
+            height: 28px;
+            border-radius: 30px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid rgba(255,255,255,0.6);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 30px;
+            background: linear-gradient(90deg, #f94144, #f3722c, #f8961e, #f9c74f, #90be6d, #43aa8b, #577590);
+            background-size: 200% 100%;
+            transition: width 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+            box-shadow: 0 0 15px #ffb3c6;
+            animation: rainbowMove 3s infinite alternate;
+        }
+
+        @keyframes rainbowMove {
+            0% { background-position: 0% 0; }
+            100% { background-position: 100% 0; }
+        }
+
+        .stats-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 18px 0 12px;
+            color: #2f1b3a;
+            background: rgba(255, 235, 245, 0.8);
+            padding: 16px 18px;
+            border-radius: 28px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #7a5b7a;
+            letter-spacing: 2px;
+        }
+
+        .stat-number {
+            font-size: 1.9rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #1e1e2a;
+        }
+
+        .badge-desc {
+            background: white;
+            padding: 14px 22px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1.3rem;
+            display: inline-block;
+            box-shadow: 0 3px 0 #ffb8d1;
+            color: #2c1a4e;
+            border: 1.5px solid #ffb3c1;
+            margin-top: 8px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .footnote {
+            margin-top: 25px;
+            color: #7b6d7c;
+            font-size: 0.8rem;
+            text-align: center;
+            border-top: 1px dashed #e0b6c2;
+            padding-top: 20px;
+            font-style: italic;
+        }
+
+        .rainbow-factor {
+            background: #fff0e7;
+            border-radius: 50px;
+            padding: 6px 18px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #7f4f5a;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .example-tag {
+            color: #a06b9a;
+            background: rgba(234, 204, 255, 0.5);
+            border-radius: 50px;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid #ffa5a5;
+        }
+
+        .example-tag:hover {
+            background: #ffd9df;
+        }
+
+        @media (max-width: 480px) {
+            .rainbow-card { padding: 22px 18px; }
+            h1 { font-size: 1.8rem; }
+            .input-area { border-radius: 30px; padding-left: 18px; }
+            .rainbow-btn { padding: 12px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="rainbow-card">
+        <div class="rainbow-header"></div>
+        <h1>
+            <span>🌈</span> 彩虹哈希
+        </h1>
+        <div class="sub">
+            <span>名字 · 熵 · 骄傲指数</span>
+            <span class="rainbow-factor">🏳️‍🌈 纯属娱乐</span>
+        </div>
+
+        <!-- 输入区 -->
+        <div class="input-area">
+            <input type="text" id="nameInput" placeholder="输入任何名字, e.g. Taylor" value="Alex" autofocus>
+            <button class="rainbow-btn" id="calcBtn">
+                ✦ 计算指数
+            </button>
+        </div>
+
+        <!-- 快速示例标签（点击填充） -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+            <span class="example-tag" onclick="fillExample('Jordan')">Jordan</span>
+            <span class="example-tag" onclick="fillExample('Riley')">Riley</span>
+            <span class="example-tag" onclick="fillExample('Casey')">Casey</span>
+            <span class="example-tag" onclick="fillExample('Skyler')">Skyler</span>
+            <span class="example-tag" onclick="fillExample('Quinn')">Quinn</span>
+        </div>
+
+        <!-- 结果面板，动态渲染 -->
+        <div class="result-panel" id="resultPanel">
+            <!-- 初始状态会通过JS填充 -->
+        </div>
+
+        <div class="footnote">
+            ⚡ 基于djb2哈希 + 彩虹字母因子 · 每一个名字都是独一无二的熵值艺术<br>
+            ❤️ 爱无需指数定义，这里只有笑声和彩虹
+        </div>
+    </div>
+
+    <script>
+        // -----------------------------------------------------
+        // 纯娱乐 · 名字Gay指数计算器 · 哈希核心
+        // 哈希算法: djb2 (32位) -> 生成8位十六进制哈希
+        // 彩虹因子: 名字中包含 r o y g b i v (不区分大小写) 每个+2% (上限20%)
+        // 最终指数 = (哈希整数 % 101) + 彩虹加成 (不超过100)
+        // -----------------------------------------------------
+
+        // ----- 哈希函数 (返回8位十六进制字符串) -----
+        function simpleHash(str) {
+            let hash = 5381;       // djb2常用种子
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) + hash) + char; // hash * 33 + char
+                hash = hash & hash;                // 保持32位
+            }
+            // 转换为无符号32位十六进制，补足8位
+            return (hash >>> 0).toString(16).padStart(8, '0');
+        }
+
+        // ----- 彩虹因子计算 -----
+        function countRainbowLetters(name) {
+            const rainbowSet = new Set(['r', 'o', 'y', 'g', 'b', 'i', 'v']);
+            let count = 0;
+            for (let ch of name.toLowerCase()) {
+                if (rainbowSet.has(ch)) count++;
+            }
+            return count;
+        }
+
+        // ----- 核心指数计算器 -----
+        function calculateGayIndex(name) {
+            if (!name || name.trim() === '') {
+                return null;
+            }
+
+            const cleanName = name.trim().toLowerCase();
+            
+            // 1. 哈希值计算
+            const hashHex = simpleHash(cleanName);
+            const hashInt = parseInt(hashHex, 16);      // 0 ~ 4294967295
+            const baseIndex = hashInt % 101;            // 0-100 基础指数
+
+            // 2. 彩虹因子：每个彩虹字母 +2%，最多20%
+            const rainbowCount = countRainbowLetters(cleanName);
+            let rainbowBonus = Math.min(20, rainbowCount * 2);
+            
+            // 3. 最终指数 (上限100)
+            let finalIndex = baseIndex + rainbowBonus;
+            if (finalIndex > 100) finalIndex = 100;
+
+            // 4. 趣味描述 (6档)
+            let description = '';
+            if (finalIndex <= 15) description = '💎 直如钢筋';
+            else if (finalIndex <= 30) description = '➡️ 非常直的箭头';
+            else if (finalIndex <= 50) description = '🌀 偶尔会弯一下';
+            else if (finalIndex <= 70) description = '🌈 灵活取向';
+            else if (finalIndex <= 89) description = '📡 彩虹雷达滴滴响';
+            else description = '🏳️‍🌈 行走的彩虹旗';
+
+            return {
+                hash: hashHex,
+                baseIndex: baseIndex,
+                rainbowBonus: rainbowBonus,
+                finalIndex: finalIndex,
+                description: description,
+                rainbowCount: rainbowCount,
+                fullName: name.trim()
+            };
+        }
+
+        // ----- 渲染UI -----
+        function renderResult(result) {
+            const panel = document.getElementById('resultPanel');
+            if (!result) {
+                panel.innerHTML = `<div style="padding: 20px; text-align: center; color: #a06a8a;">✨ 输入一个名字，看看彩虹熵值～</div>`;
+                return;
+            }
+
+            const hashShort = result.hash; // 8位
+            // 构造显示用的完整哈希标签
+            const hashDisplay = `${hashShort.substring(0, 4)} ${hashShort.substring(4, 8)}`;
+
+            // 进度条宽度
+            const progressWidth = result.finalIndex;
+
+            // 彩虹因子文本
+            const bonusText = result.rainbowBonus > 0 ? `+${result.rainbowBonus}% (${result.rainbowCount}个🌈字母)` : `+0% (无彩虹字母)`;
+
+            const html = `
+                <div class="hash-badge">
+                    <span style="display: flex; gap: 6px; align-items: center;">🔑 哈希值(djb2)</span>
+                    <span class="hash-value" style="font-size: 1.2rem;">0x${hashDisplay}</span>
+                </div>
+
+                <div class="gay-meter">
+                    <div class="meter-label">
+                        <span>🏳️‍🌈 GAY指数</span>
+                        <span style="background: #1e1e2a; color: white; padding: 6px 16px; border-radius: 80px;">${result.finalIndex}%</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-fill" style="width: ${progressWidth}%;"></div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">基础哈希指数</span>
+                        <span class="stat-number">${result.baseIndex}%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">🌈 彩虹加成</span>
+                        <span class="stat-number" style="color: #d62878;">+${result.rainbowBonus}%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">字母含虹量</span>
+                        <span class="stat-number">${result.rainbowCount}</span>
+                    </div>
+                </div>
+
+                <div class="badge-desc">
+                    ${result.description}
+                </div>
+                <p style="margin-top: 18px; font-size: 0.85rem; color: #5d5179; display: flex; justify-content: center; gap: 18px; flex-wrap: wrap;">
+                    <span>⚡ 哈希取模: ${result.baseIndex}</span>
+                    <span>🎨 ${bonusText}</span>
+                </p>
+            `;
+            panel.innerHTML = html;
+        }
+
+        // ----- 计算主流程 -----
+        function computeAndRender() {
+            const input = document.getElementById('nameInput');
+            let name = input.value;
+            if (!name || name.trim() === '') {
+                renderResult(null);
+                return;
+            }
+            const result = calculateGayIndex(name);
+            renderResult(result);
+        }
+
+        // ----- 填充示例 (点击快速填入) -----
+        window.fillExample = function(exampleName) {
+            const input = document.getElementById('nameInput');
+            input.value = exampleName;
+            computeAndRender();
+        };
+
+        // ----- 初始化绑定事件和默认值-----
+        window.onload = function() {
+            const btn = document.getElementById('calcBtn');
+            const input = document.getElementById('nameInput');
+            
+            // 绑定计算按钮
+            btn.addEventListener('click', computeAndRender);
+            
+            // 绑定回车事件
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    computeAndRender();
+                }
+            });
+
+            // 默认计算 (Alex)
+            computeAndRender();
+        };
+
+        // 附加：防抖不需要，轻量娱乐
+    </script>
+
+    <!-- 确保即使脚本加载延迟，example tags也能工作（已在window作用域） -->
+</body>
+</html>
